@@ -1,10 +1,9 @@
 import express from "express";
-import fetch from "node-fetch";
 
 const app = express();
 app.use(express.json());
 
-const SLACK_TOKEN = "xoxb-TU-TOKEN-AQUI"; // 👈 tu token aquí
+const SLACK_TOKEN = "xoxb-TU-TOKEN-AQUI"; // 👈 pega tu token real aquí
 
 // Ruta base
 app.get("/", (req, res) => {
@@ -15,7 +14,7 @@ app.get("/", (req, res) => {
 app.post("/slack/events", async (req, res) => {
   const data = req.body;
 
-  // verificación
+  // Verificación de Slack
   if (data.type === "url_verification") {
     return res.send(data.challenge);
   }
@@ -26,19 +25,17 @@ app.post("/slack/events", async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // limpiar mensaje
   let text = event.text || "";
   text = text.replace(/<@[^>]+>/g, "").trim();
 
   const channel = event.channel;
 
-  // 🔥 RESPUESTA DEL BOT
   await sendMessage(channel, `Recibí: ${text}`);
 
   return res.sendStatus(200);
 });
 
-// enviar mensaje
+// Enviar mensaje a Slack
 async function sendMessage(channel, text) {
   await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
