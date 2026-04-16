@@ -14,7 +14,12 @@ app.get("/", (req, res) => {
 // Eventos Slack
 app.post("/slack/events", async (req, res) => {
   const data = req.body;
-
+  
+// 🚫 evitar reintentos duplicados de Slack
+if (req.headers["x-slack-retry-num"]) {
+  return res.sendStatus(200);
+}
+  
   // Verificación
   if (data.type === "url_verification") {
     return res.send(data.challenge);
@@ -22,9 +27,15 @@ app.post("/slack/events", async (req, res) => {
 
   const event = data.event;
 
-  if (!event || event.bot_id) {
-    return res.sendStatus(200);
-  }
+// 🚫 ignorar eventos inválidos o bots
+if (!event || event.bot_id) {
+  return res.sendStatus(200);
+}
+
+// ✅ SOLO responder a menciones
+if (event.type !== "app_mention") {
+  return res.sendStatus(200);
+}
 
   let text = event.text || "";
   text = text.replace(/<@[^>]+>/g, "").trim();
