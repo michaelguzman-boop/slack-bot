@@ -3,7 +3,7 @@ import express from "express";
 const app = express();
 app.use(express.json());
 
-const SLACK_TOKEN = "xoxb-TU-TOKEN-AQUI"; // 👈 pega tu token real aquí
+const SLACK_TOKEN = "xoxb-10960574360656-10916976075367-fukJwrS0nKpXeSReXGQNVh5n"; // 👈 pega tu token real aquí
 
 // Ruta base
 app.get("/", (req, res) => {
