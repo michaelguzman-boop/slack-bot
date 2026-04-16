@@ -3,10 +3,15 @@ import express from "express";
 const app = express();
 app.use(express.json());
 
+// 👉 ruta principal (esto arregla el "Not Found")
+app.get("/", (req, res) => {
+  res.send("Bot activo 🚀");
+});
+
+// 👉 endpoint para Slack
 app.post("/slack/events", (req, res) => {
   const data = req.body;
 
-  // 🔥 ESTO ES LO QUE SLACK NECESITA
   if (data.type === "url_verification") {
     return res.send(data.challenge);
   }
@@ -14,10 +19,7 @@ app.post("/slack/events", (req, res) => {
   return res.sendStatus(200);
 });
 
-app.get("/", (req, res) => {
-  res.send("Bot activo 🚀");
-});
-
+// 👉 puerto correcto (IMPORTANTE)
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
