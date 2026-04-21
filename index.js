@@ -3,7 +3,7 @@ import express from "express";
 const app = express();
 app.use(express.json());
 
-const SLACK_TOKEN = "xoxb-10960574360656-10916976075367-fukJwrS0nKpXeSReXGQNVh5n";
+const SLACK_TOKEN = "xoxb-TU-TOKEN-AQUI";
 const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbzd62NFKpjKbK4NO3CjhRIfn6JKJGwD6km0qtui7JDYwcOkuWIlQ2mxWC8jT6y2eLi70Q/exec";
 
 // Ruta base
@@ -15,31 +15,39 @@ app.get("/", (req, res) => {
 app.post("/slack/events", async (req, res) => {
   const data = req.body;
 
-  // ✅ RESPONDER INMEDIATO (evita duplicados y delays)
-  res.sendStatus(200);
+  // evitar duplicados
+  if (req.headers["x-slack-retry-num"]) {
+    return res.sendStatus(200);
+  }
 
-  // 🚫 evitar reintentos de Slack
-  if (req.headers["x-slack-retry-num"]) return;
-
-  // Verificación inicial
-  if (data.type === "url_verification") return;
+  // verificación
+  if (data.type === "url_verification") {
+    return res.send(data.challenge);
+  }
 
   const event = data.event;
 
-  // 🚫 ignorar bots o basura
-  if (!event || event.bot_id) return;
+  if (!event || event.bot_id) {
+    return res.sendStatus(200);
+  }
 
-  // ✅ solo responder cuando mencionan al bot
-  if (event.type !== "app_mention") return;
+  if (event.type !== "app_mention") {
+    return res.sendStatus(200);
+  }
 
   let text = event.text || "";
   text = text.replace(/<@[^>]+>/g, "").trim();
 
   const channel = event.channel;
+  const userId = event.user;
 
   try {
+    // 🔥 obtener nombre real
+    const userName = await getUserName(userId);
+
+    // llamar Apps Script
     const response = await fetch(
-      `${SHEET_API_URL}?q=${encodeURIComponent(text)}&user=${encodeURIComponent(event.user)}`
+      `${SHEET_API_URL}?q=${encodeURIComponent(text)}&user=${encodeURIComponent(userName)}`
     );
 
     const result = await response.text();
@@ -47,12 +55,37 @@ app.post("/slack/events", async (req, res) => {
     await sendMessage(channel, result);
 
   } catch (error) {
-    console.error("ERROR:", error);
     await sendMessage(channel, "❌ Error obteniendo datos");
   }
+
+  return res.sendStatus(200);
 });
 
-// enviar mensaje a Slack
+/**
+ * 🔥 OBTENER NOMBRE REAL DESDE SLACK
+ */
+async function getUserName(userId) {
+  try {
+    const res = await fetch(`https://slack.com/api/users.info?user=${userId}`, {
+      headers: {
+        Authorization: `Bearer ${SLACK_TOKEN}`
+      }
+    });
+
+    const data = await res.json();
+
+    if (data.ok) {
+      return data.user.real_name || data.user.name;
+    }
+
+    return userId;
+
+  } catch (err) {
+    return userId;
+  }
+}
+
+// enviar mensaje
 async function sendMessage(channel, text) {
   await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
