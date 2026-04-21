@@ -15,25 +15,20 @@ app.get("/", (req, res) => {
 app.post("/slack/events", async (req, res) => {
   const data = req.body;
 
-  // evitar duplicados
-  if (req.headers["x-slack-retry-num"]) {
-    return res.sendStatus(200);
-  }
+  // ✅ RESPONDER INMEDIATO (CRÍTICO)
+  res.sendStatus(200);
+
+  // 🚫 evitar duplicados
+  if (req.headers["x-slack-retry-num"]) return;
 
   // verificación
-  if (data.type === "url_verification") {
-    return res.send(data.challenge);
-  }
+  if (data.type === "url_verification") return;
 
   const event = data.event;
 
-  if (!event || event.bot_id) {
-    return res.sendStatus(200);
-  }
+  if (!event || event.bot_id) return;
 
-  if (event.type !== "app_mention") {
-    return res.sendStatus(200);
-  }
+  if (event.type !== "app_mention") return;
 
   let text = event.text || "";
   text = text.replace(/<@[^>]+>/g, "").trim();
@@ -42,10 +37,15 @@ app.post("/slack/events", async (req, res) => {
   const userId = event.user;
 
   try {
-    // 🔥 obtener nombre real
-    const userName = await getUserName(userId);
+    // 🔥 obtener nombre real (con fallback)
+    let userName = userId;
 
-    // llamar Apps Script
+    try {
+      userName = await getUserName(userId);
+    } catch (e) {
+      console.log("User error:", e);
+    }
+
     const response = await fetch(
       `${SHEET_API_URL}?q=${encodeURIComponent(text)}&user=${encodeURIComponent(userName)}`
     );
@@ -55,34 +55,28 @@ app.post("/slack/events", async (req, res) => {
     await sendMessage(channel, result);
 
   } catch (error) {
+    console.error(error);
     await sendMessage(channel, "❌ Error obteniendo datos");
   }
-
-  return res.sendStatus(200);
 });
 
 /**
  * 🔥 OBTENER NOMBRE REAL DESDE SLACK
  */
 async function getUserName(userId) {
-  try {
-    const res = await fetch(`https://slack.com/api/users.info?user=${userId}`, {
-      headers: {
-        Authorization: `Bearer ${SLACK_TOKEN}`
-      }
-    });
-
-    const data = await res.json();
-
-    if (data.ok) {
-      return data.user.real_name || data.user.name;
+  const res = await fetch(`https://slack.com/api/users.info?user=${userId}`, {
+    headers: {
+      Authorization: `Bearer ${SLACK_TOKEN}`
     }
+  });
 
-    return userId;
+  const data = await res.json();
 
-  } catch (err) {
-    return userId;
+  if (data.ok) {
+    return data.user.real_name || data.user.name;
   }
+
+  return userId;
 }
 
 // enviar mensaje
