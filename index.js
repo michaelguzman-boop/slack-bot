@@ -3,7 +3,7 @@ import express from "express";
 const app = express();
 app.use(express.json());
 
-const SLACK_TOKEN = "xoxb-TU-TOKEN-AQUI";
+const SLACK_TOKEN = "xoxb-10960574360656-10916976075367-fukJwrS0nKpXeSReXGQNVh5n";
 const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbzd62NFKpjKbK4NO3CjhRIfn6JKJGwD6km0qtui7JDYwcOkuWIlQ2mxWC8jT6y2eLi70Q/exec";
 
 // Ruta base
