@@ -39,7 +39,7 @@ app.post("/slack/events", async (req, res) => {
 
   try {
     const response = await fetch(
-      `${SHEET_API_URL}?q=${encodeURIComponent(text)}`
+      `${SHEET_API_URL}?q=${encodeURIComponent(text)}&user=${encodeURIComponent(event.user)}`
     );
 
     const result = await response.text();
