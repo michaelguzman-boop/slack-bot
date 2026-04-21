@@ -15,37 +15,43 @@ app.get("/", (req, res) => {
 app.post("/slack/events", async (req, res) => {
   const data = req.body;
 
-  // ✅ RESPONDER INMEDIATO (CRÍTICO)
+  // ✅ responder inmediato
   res.sendStatus(200);
 
-  // 🚫 evitar duplicados
+  // evitar duplicados
   if (req.headers["x-slack-retry-num"]) return;
 
-  // verificación
+  // verificación inicial
   if (data.type === "url_verification") return;
 
   const event = data.event;
 
+  // ignorar bots
   if (!event || event.bot_id) return;
 
-  if (event.type !== "app_mention") return;
+  // 🔥 SOLO responder en DM o menciones
+  if (event.channel_type !== "im" && event.type !== "app_mention") {
+    return;
+  }
 
   let text = event.text || "";
+
+  // limpiar mención
   text = text.replace(/<@[^>]+>/g, "").trim();
 
   const channel = event.channel;
   const userId = event.user;
 
   try {
-    // 🔥 obtener nombre real (con fallback)
-    let userName = userId;
+    const userName = await getUserName(userId);
 
-    try {
-      userName = await getUserName(userId);
-    } catch (e) {
-      console.log("User error:", e);
+    // 👇 BONUS: saludo automático
+    if (!text || text.toLowerCase() === "hi" || text.toLowerCase() === "hello") {
+      await sendMessage(channel, `Hey ${userName} 👋\nHow can I help you today?`);
+      return;
     }
 
+    // llamar Apps Script
     const response = await fetch(
       `${SHEET_API_URL}?q=${encodeURIComponent(text)}&user=${encodeURIComponent(userName)}`
     );
@@ -61,25 +67,32 @@ app.post("/slack/events", async (req, res) => {
 });
 
 /**
- * 🔥 OBTENER NOMBRE REAL DESDE SLACK
+ * 🔥 Obtener nombre real
  */
 async function getUserName(userId) {
-  const res = await fetch(`https://slack.com/api/users.info?user=${userId}`, {
-    headers: {
-      Authorization: `Bearer ${SLACK_TOKEN}`
+  try {
+    const res = await fetch(`https://slack.com/api/users.info?user=${userId}`, {
+      headers: {
+        Authorization: `Bearer ${SLACK_TOKEN}`
+      }
+    });
+
+    const data = await res.json();
+
+    if (data.ok) {
+      return data.user.real_name || data.user.name;
     }
-  });
 
-  const data = await res.json();
+    return userId;
 
-  if (data.ok) {
-    return data.user.real_name || data.user.name;
+  } catch {
+    return userId;
   }
-
-  return userId;
 }
 
-// enviar mensaje
+/**
+ * 📩 Enviar mensaje
+ */
 async function sendMessage(channel, text) {
   await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
