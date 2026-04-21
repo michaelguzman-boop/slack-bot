@@ -14,28 +14,23 @@ app.get("/", (req, res) => {
 // Eventos Slack
 app.post("/slack/events", async (req, res) => {
   const data = req.body;
-  
-// 🚫 evitar reintentos duplicados de Slack
-if (req.headers["x-slack-retry-num"]) {
-  return res.sendStatus(200);
-}
-  
-  // Verificación
-  if (data.type === "url_verification") {
-    return res.send(data.challenge);
-  }
+
+  // ✅ RESPONDER INMEDIATO (evita duplicados y delays)
+  res.sendStatus(200);
+
+  // 🚫 evitar reintentos de Slack
+  if (req.headers["x-slack-retry-num"]) return;
+
+  // Verificación inicial
+  if (data.type === "url_verification") return;
 
   const event = data.event;
 
-// 🚫 ignorar eventos inválidos o bots
-if (!event || event.bot_id) {
-  return res.sendStatus(200);
-}
+  // 🚫 ignorar bots o basura
+  if (!event || event.bot_id) return;
 
-// ✅ SOLO responder a menciones
-if (event.type !== "app_mention") {
-  return res.sendStatus(200);
-}
+  // ✅ solo responder cuando mencionan al bot
+  if (event.type !== "app_mention") return;
 
   let text = event.text || "";
   text = text.replace(/<@[^>]+>/g, "").trim();
@@ -43,7 +38,6 @@ if (event.type !== "app_mention") {
   const channel = event.channel;
 
   try {
-    // ✅ fetch ya viene incluido en Node 22
     const response = await fetch(
       `${SHEET_API_URL}?q=${encodeURIComponent(text)}`
     );
@@ -53,13 +47,12 @@ if (event.type !== "app_mention") {
     await sendMessage(channel, result);
 
   } catch (error) {
+    console.error("ERROR:", error);
     await sendMessage(channel, "❌ Error obteniendo datos");
   }
-
-  return res.sendStatus(200);
 });
 
-// enviar mensaje
+// enviar mensaje a Slack
 async function sendMessage(channel, text) {
   await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
